@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import SearchFilter from "./components/SearchFilter";
 import PersonForm from "./components/PersonForm";
 import Persons from "./components/Persons";
@@ -6,6 +7,7 @@ import Notification from "./components/Notification";
 import personService from "./services/personService";
 
 const App = () => {
+  const [persons, setPersons] = useState([]);
   const [persons, setPersons] = useState([]);
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
@@ -122,6 +124,7 @@ const App = () => {
       />
 
       <h2>Numbers</h2>
+      <Persons persons={personsToShow} handleDelete={handleDelete} />
       <Persons persons={personsToShow} handleDelete={handleDelete} />
     </div>
   );
