@@ -44,25 +44,29 @@ const App = () => {
       number: newNumber,
     };
 
-    personService.create(newPerson).then((returnedPerson) => {
-      setPersons(persons.concat(returnedPerson));
-      setNotification({
-        type: "success",
-        message: `Added ${returnedPerson.name}`,
+    personService
+      .create(newPerson)
+      .then((returnedPerson) => {
+        setPersons(persons.concat(returnedPerson));
+        setNotification({
+          type: "success",
+          message: `Added ${returnedPerson.name}`,
+        });
+      })
+      .catch((error) => {
+        setNotification({ type: "error", message: error.response.data });
       });
-    });
   };
 
   const updatePerson = () => {
-    const updatedPerson = persons.find((person) => person.name === newName);
-    updatedPerson.number = newNumber;
+    const matchedPerson = persons.find((person) => person.name === newName);
 
     personService
-      .update(updatedPerson.id, updatedPerson)
+      .update(matchedPerson.id, { ...matchedPerson, number: newNumber })
       .then((returnedPerson) => {
         setPersons(
           persons.map((person) =>
-            person.id === updatedPerson.id ? returnedPerson : person
+            person.id === matchedPerson.id ? returnedPerson : person
           )
         );
         setNotification({
@@ -71,9 +75,14 @@ const App = () => {
         });
       })
       .catch((error) => {
+        const errorMessage =
+          error.response.status === 404
+            ? `Information of ${matchedPerson.name} has already been removed from server`
+            : error.response.data;
+
         setNotification({
           type: "error",
-          message: `Information of ${updatedPerson.name} has already been removed from server`,
+          message: errorMessage,
         });
       });
   };
