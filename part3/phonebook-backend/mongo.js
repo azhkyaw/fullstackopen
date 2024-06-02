@@ -41,7 +41,6 @@ if (mode === "create") {
   });
 } else {
   Person.find({}).then((result) => {
-    console.log("phonebook:")
     result.forEach((person) => {
       console.log(person.name, person.number);
     });
