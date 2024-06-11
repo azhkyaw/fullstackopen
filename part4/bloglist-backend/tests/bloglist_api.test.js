@@ -1,13 +1,12 @@
 const { test, after, beforeEach, describe } = require("node:test");
 const assert = require("assert");
-const mongoose = require("mongoose");
 const supertest = require("supertest");
+const mongoose = require("mongoose");
 const app = require("../app");
-const api = supertest(app);
-
 const helper = require("./test_helper");
-
 const Blog = require("../models/blog");
+
+const api = supertest(app);
 
 describe("when there are intially some blogs saved", () => {
   beforeEach(async () => {
@@ -15,7 +14,7 @@ describe("when there are intially some blogs saved", () => {
     await Blog.insertMany(helper.initialBlogs);
   });
 
-  test("six blogs are returned as json", async () => {
+  test.only("six blogs are returned as json", async () => {
     const response = await api
       .get("/api/blogs")
       .expect(200)
