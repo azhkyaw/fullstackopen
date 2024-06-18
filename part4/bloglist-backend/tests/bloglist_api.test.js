@@ -1,12 +1,23 @@
-const { test, after, beforeEach, describe } = require("node:test");
+const { test, after, beforeEach, describe, before } = require("node:test");
 const assert = require("assert");
 const supertest = require("supertest");
 const mongoose = require("mongoose");
 const app = require("../app");
 const helper = require("./test_helper");
 const Blog = require("../models/blog");
+const User = require("../models/user");
 
+let token;
 const api = supertest(app);
+
+before(async () => {
+  await User.deleteMany({});
+
+  const userCredentials = { username: "testuser", password: "mypassword" };
+  await api.post("/api/users").send(userCredentials);
+  const result = await api.post("/api/login").send(userCredentials);
+  token = result._body.token;
+});
 
 describe("when there are intially some blogs saved", () => {
   beforeEach(async () => {
@@ -14,7 +25,7 @@ describe("when there are intially some blogs saved", () => {
     await Blog.insertMany(helper.initialBlogs);
   });
 
-  test.only("six blogs are returned as json", async () => {
+  test("six blogs are returned as json", async () => {
     const response = await api
       .get("/api/blogs")
       .expect(200)
@@ -65,7 +76,7 @@ describe("when there are intially some blogs saved", () => {
 
   describe("addition of a new blog", () => {
     test("a valid blog can be added", async () => {
-      const blog = {
+      const newBlog = {
         title: "Functional Duplications",
         author: "Robert C. Martin",
         url: "https://blog.cleancoder.com/uncle-bob/2021/10/28/functional-duplication.html",
@@ -74,7 +85,8 @@ describe("when there are intially some blogs saved", () => {
 
       await api
         .post("/api/blogs")
-        .send(blog)
+        .set({ Authorization: `Bearer ${token}` })
+        .send(newBlog)
         .expect(201)
         .expect("Content-Type", /application\/json/);
 
@@ -85,26 +97,55 @@ describe("when there are intially some blogs saved", () => {
       assert(titles.includes("Functional Duplications"));
     });
 
+    test("a blog cannot be added if token is not provided", async () => {
+      const newBlog = {
+        title: "Functional Duplications",
+        author: "Robert C. Martin",
+        url: "https://blog.cleancoder.com/uncle-bob/2021/10/28/functional-duplication.html",
+        likes: 5,
+      };
+
+      await api
+        .post("/api/blogs")
+        .send(newBlog)
+        .expect(401)
+        .expect("Content-Type", /application\/json/);
+
+      const blogsAtEnd = await helper.blogsInDb();
+      const titles = blogsAtEnd.map((blog) => blog.title);
+
+      assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length);
+      assert(!titles.includes("Functional Duplications"));
+    });
+
     test("if the likes property is missing from the request, it defaults to 0", async () => {
-      const blog = {
+      const newBlog = {
         title: "Functional Duplications",
         author: "Robert C. Martin",
         url: "https://blog.cleancoder.com/uncle-bob/2021/10/28/functional-duplication.html",
       };
 
-      const response = await api.post("/api/blogs").send(blog);
+      const response = await api
+        .post("/api/blogs")
+        .set({ Authorization: `Bearer ${token}` })
+        .send(newBlog)
+        .expect(201);
 
       assert.strictEqual(response.body.likes, 0);
     });
 
     test("blog without title is not added", async () => {
-      const blog = {
+      const newBlog = {
         author: "Robert C. Martin",
         url: "https://blog.cleancoder.com/uncle-bob/2021/10/28/test.html",
-        likes: 2,
+        likes: 5,
       };
 
-      await api.post("/api/blogs").send(blog).expect(400);
+      await api
+        .post("/api/blogs")
+        .send(newBlog)
+        .set({ Authorization: `Bearer ${token}` })
+        .expect(400);
 
       const blogsAtEnd = await helper.blogsInDb();
 
@@ -112,13 +153,17 @@ describe("when there are intially some blogs saved", () => {
     });
 
     test("blog without url is not added", async () => {
-      const blog = {
+      const newBlog = {
         title: "Functional Duplications",
         author: "Robert C. Martin",
-        likes: 2,
+        likes: 5,
       };
 
-      await api.post("/api/blogs").send(blog).expect(400);
+      await api
+        .post("/api/blogs")
+        .send(newBlog)
+        .set({ Authorization: `Bearer ${token}` })
+        .expect(400);
 
       const blogsAtEnd = await helper.blogsInDb();
 
@@ -127,23 +172,79 @@ describe("when there are intially some blogs saved", () => {
   });
 
   describe("deletion of a blog", () => {
-    test("an existing blog can be deleted", async () => {
-      const blogsAtStart = await helper.blogsInDb();
-      const blogToDelete = blogsAtStart[0];
+    test("an existing blog can be deleted by the same user who created it", async () => {
+      const newBlog = {
+        title: "Functional Duplications",
+        author: "Robert C. Martin",
+        url: "https://blog.cleancoder.com/uncle-bob/2021/10/28/functional-duplication.html",
+        likes: 5,
+      };
 
-      await api.delete(`/api/blogs/${blogToDelete.id}`).expect(204);
+      const response = await api
+        .post("/api/blogs")
+        .set({ Authorization: `Bearer ${token}` })
+        .send(newBlog);
+
+      await api
+        .delete(`/api/blogs/${response.body.id}`)
+        .set({ Authorization: `Bearer ${token}` })
+        .expect(204);
 
       const blogsAtEnd = await helper.blogsInDb();
 
       const titles = blogsAtEnd.map((r) => r.title);
-      assert(!titles.includes(blogToDelete.title));
+      assert(!titles.includes("Functional Duplications"));
 
-      assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length - 1);
+      assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length);
     });
 
-    test("statuscode 204 is returned if blog does not exist", async () => {
+    test("statuscode 204 is returned even if blog does not exist", async () => {
       const validNonexistingId = await helper.nonExistingId();
       await api.delete(`/api/blogs/${validNonexistingId}`).expect(204);
+    });
+
+    test("a blog cannot be deleted if token is not provided", async () => {
+      const blogsAtStart = await helper.blogsInDb();
+
+      await api.delete(`/api/blogs/${blogsAtStart[0].id}`).expect(401);
+
+      const blogsAtEnd = await helper.blogsInDb();
+
+      assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length);
+    });
+
+    test("a blog cannot be deleted by other user", async () => {
+      const newBlog = {
+        title: "Functional Duplications",
+        author: "Robert C. Martin",
+        url: "https://blog.cleancoder.com/uncle-bob/2021/10/28/functional-duplication.html",
+        likes: 5,
+      };
+
+      const differentUser = {
+        username: "differentuser",
+        password: "mypassword",
+      };
+      await api.post("/api/users").send(differentUser);
+      const result = await api.post("/api/login").send(differentUser);
+      const differentUserToken = result._body.token;
+
+      const response = await api
+        .post("/api/blogs")
+        .set({ Authorization: `Bearer ${token}` })
+        .send(newBlog);
+
+      await api
+        .delete(`/api/blogs/${response.body.id}`)
+        .set({ Authorization: `Bearer ${differentUserToken}` })
+        .expect(401);
+
+      const blogsAtEnd = await helper.blogsInDb();
+
+      const titles = blogsAtEnd.map((r) => r.title);
+      assert(titles.includes("Functional Duplications"));
+
+      assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length + 1);
     });
   });
 
@@ -164,8 +265,6 @@ describe("when there are intially some blogs saved", () => {
       );
 
       assert.strictEqual(updatedBlog.likes, 20);
-
-      assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length);
     });
 
     test("statuscode 404 is returned if blog does not exist", async () => {
