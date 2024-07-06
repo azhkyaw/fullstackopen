@@ -1,0 +1,21 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Specific bloglist_api.test.js Test Case",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}\\tests\\bloglist_api.test.js",
+      "args": [],
+      "internalConsoleOptions": "openOnSessionStart",
+      "env": {
+        "NODE_ENV": "test",
+        "TEST_NAME_PATTERN": "six blogs are returned as json"
+      },
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}
