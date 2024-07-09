@@ -13,13 +13,17 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [notification, setNotification] = useState(null);
 
+  const loginFormRef = useRef();
+  const blogFormRef = useRef();
+
   useEffect(() => {
     const getAllBlogs = async () => {
-      const initialBlogs = await blogService.getAll();
-      initialBlogs.sort((a, b) => a.likes - b.likes);
+      let initialBlogs = await blogService.getAll();
+      initialBlogs.sort((a, b) => b.likes - a.likes);
       setBlogs(initialBlogs);
     };
     getAllBlogs();
+    loginFormRef.current.toggleVisibility();
   }, []);
 
   useEffect(() => {
@@ -31,9 +35,6 @@ const App = () => {
     }
   }, []);
 
-  const loginFormRef = useRef();
-  const blogFormRef = useRef();
-
   const handleLogin = async (credentialsObject) => {
     try {
       const user = await loginService.login(credentialsObject);
@@ -43,6 +44,7 @@ const App = () => {
       setUser(user);
 
       const blogs = await blogService.getAll();
+      blogs.sort((a, b) => b.likes - a.likes);
       setBlogs(blogs);
     } catch (error) {
       setNotification({ type: "error", message: error.response.data.error });
